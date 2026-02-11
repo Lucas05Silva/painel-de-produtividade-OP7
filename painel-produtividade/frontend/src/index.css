@@ -42,16 +42,46 @@ body {
 
 /* Card personalizado */
 .card {
-  @apply bg-card-dark rounded-lg p-6 shadow-lg hover:shadow-xl transition-shadow;
+  background-color: #1e293b;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease-in-out;
+}
+
+.card:hover {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
 }
 
 /* Botão personalizado */
 .btn-primary {
-  @apply bg-primary hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors;
+  background-color: #2563eb;
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.3s ease-in-out;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8;
 }
 
 .btn-secondary {
-  @apply bg-slate-dark hover:bg-slate-700 text-light font-semibold py-2 px-4 rounded-lg transition-colors;
+  background-color: #475569;
+  color: #f8fafc;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  transition: background-color 0.3s ease-in-out;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: #334155;
 }
 
 /* Scroll customizado */
