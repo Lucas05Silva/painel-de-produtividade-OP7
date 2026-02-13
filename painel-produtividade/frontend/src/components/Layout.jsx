@@ -3,15 +3,17 @@ import Navbar from './Navbar';
 
 export default function Layout({ children }) {
   return (
-    <div className="bg-dark-bg text-light min-h-screen">
+    <div className="bg-white text-black min-h-screen flex">
       <Sidebar />
-      <Navbar />
-      {/* Main Content */}
-      <main className="lg:ml-64 mt-16 p-6">
-        <div className="animate-fadeIn">
-          {children}
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col">
+        <Navbar />
+        {/* Main Content */}
+        <main className="flex-1 overflow-auto p-6 lg:p-8">
+          <div className="animate-fadeIn max-w-7xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

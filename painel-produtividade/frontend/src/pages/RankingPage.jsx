@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Trophy, Medal, User } from 'lucide-react';
+import { Trophy, Medal, User, Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 
@@ -28,11 +28,21 @@ export default function RankingPage() {
   }, [token, period]);
 
   const getMedalIcon = (position) => {
-    if (position === 1) return <Trophy size={24} className="text-yellow-400" />;
+    if (position === 1) return <Trophy size={24} className="text-amber-400" />;
     if (position === 2) return <Medal size={24} className="text-gray-400" />;
-    if (position === 3) return <Medal size={24} className="text-orange-600" />;
+    if (position === 3) return <Medal size={24} className="text-amber-600" />;
     return null;
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -40,8 +50,8 @@ export default function RankingPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-light mb-2">Ranking de Produtividade</h1>
-            <p className="text-slate-400">Acompanhe o desempenho da equipe</p>
+            <h1 className="text-4xl font-bold text-black mb-2">Ranking de Produtividade</h1>
+            <p className="text-gray-600">Acompanhe o desempenho da equipe</p>
           </div>
 
           {/* Period Filter */}
@@ -52,8 +62,8 @@ export default function RankingPage() {
                 onClick={() => setPeriod(p)}
                 className={`px-4 py-2 rounded-lg font-semibold transition-colors capitalize ${
                   period === p
-                    ? 'bg-primary text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {p}
@@ -65,18 +75,18 @@ export default function RankingPage() {
         {/* Ranking Table */}
         <div className="space-y-3">
           {ranking.length === 0 ? (
-            <div className="card text-center py-12">
-              <p className="text-slate-400">Nenhum dado disponível</p>
+            <div className="bg-white border border-gray-200 rounded-lg text-center py-12">
+              <p className="text-gray-600">Nenhum dado disponível</p>
             </div>
           ) : (
             ranking.map((user, index) => (
-              <div key={user.id} className="card">
+              <div key={user.id} className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                     {/* Position */}
-                    <div className="w-12 h-12 rounded-lg bg-slate-700 flex items-center justify-center font-bold text-lg text-light">
+                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center font-bold text-lg text-black">
                       {getMedalIcon(index + 1) || (
-                        <span className={index + 1 <= 3 ? 'text-primary' : 'text-slate-400'}>
+                        <span className={index + 1 <= 3 ? 'text-blue-500' : 'text-gray-600'}>
                           #{index + 1}
                         </span>
                       )}
@@ -88,13 +98,13 @@ export default function RankingPage() {
                         {user.avatar ? (
                           <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
                             <User size={20} className="text-white" />
                           </div>
                         )}
                         <div>
-                          <h3 className="text-light font-semibold">{user.name}</h3>
-                          <p className="text-xs text-slate-400">{user.email}</p>
+                          <h3 className="text-black font-semibold">{user.name}</h3>
+                          <p className="text-xs text-gray-600">{user.email}</p>
                         </div>
                       </div>
                     </div>
@@ -102,8 +112,8 @@ export default function RankingPage() {
 
                   {/* Stats */}
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-primary">{user.totalTempo}</p>
-                    <p className="text-xs text-slate-400">minutos</p>
+                    <p className="text-2xl font-bold text-blue-500">{user.totalTempo}</p>
+                    <p className="text-xs text-gray-600">minutos</p>
                   </div>
                 </div>
               </div>
@@ -113,20 +123,20 @@ export default function RankingPage() {
 
         {/* Your Position */}
         {ranking.length > 0 && (
-          <div className="card border-l-4 border-primary bg-blue-500/5">
-            <h3 className="text-light font-bold mb-3">Sua Posição</h3>
+          <div className="bg-white border-l-4 border-blue-500 border border-gray-200 rounded-lg p-6">
+            <h3 className="text-black font-bold mb-4">📊 Sua Posição no Ranking</h3>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <p className="text-slate-400 text-sm">Posição</p>
-                <p className="text-2xl font-bold text-primary">#3</p>
+                <p className="text-gray-600 text-sm mb-1">Posição</p>
+                <p className="text-2xl font-bold text-blue-500">#3</p>
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Total</p>
-                <p className="text-2xl font-bold text-light">2.540 min</p>
+                <p className="text-gray-600 text-sm mb-1">Total</p>
+                <p className="text-2xl font-bold text-black">2.540 min</p>
               </div>
               <div>
-                <p className="text-slate-400 text-sm">Diferença</p>
-                <p className="text-2xl font-bold text-yellow-400">-180 min</p>
+                <p className="text-gray-600 text-sm mb-1">Diferença</p>
+                <p className="text-2xl font-bold text-amber-400">-180 min</p>
               </div>
             </div>
           </div>

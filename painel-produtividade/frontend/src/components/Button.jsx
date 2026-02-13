@@ -7,10 +7,10 @@ export function Button({
   ...props
 }) {
   const variants = {
-    primary: 'bg-primary hover:bg-blue-700 text-white',
-    secondary: 'bg-slate-700 hover:bg-slate-600 text-light',
-    danger: 'bg-red-600 hover:bg-red-700 text-white',
-    ghost: 'hover:bg-slate-700 text-light'
+    primary: 'bg-blue-500 hover:bg-blue-600 text-white',
+    secondary: 'bg-gray-200 hover:bg-gray-300 text-black border border-gray-300',
+    danger: 'bg-red-500 hover:bg-red-600 text-white',
+    ghost: 'hover:bg-gray-100 text-black border border-gray-200'
   };
 
   const sizes = {
@@ -28,7 +28,7 @@ export function Button({
       {loading ? (
         <>
           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          + Carregando...
+          Carregando...
         </>
       ) : (
         children

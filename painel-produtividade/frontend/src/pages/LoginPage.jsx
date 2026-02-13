@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import Logo from '../components/Logo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -28,20 +29,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center px-4">
+    <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary mb-2">Produtividade</h1>
-          <p className="text-slate-400">Sistema de Controle de Demandas</p>
+          <div className="flex justify-center mb-4">
+            <Logo size="lg" showText={false} />
+          </div>
+          <h1 className="text-3xl font-bold text-black mb-2">Painel de Produtividade</h1>
+          <p className="text-gray-600">OP7 Franchising - Sistema de Controle de Demandas</p>
         </div>
 
         {/* Form Card */}
-        <div className="bg-card-dark rounded-lg p-8 shadow-xl">
-          <h2 className="text-2xl font-bold text-light mb-6">Entre em sua conta</h2>
+        <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+          <h2 className="text-2xl font-bold text-black mb-6">Acessar conta</h2>
 
           {error && (
-            <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm flex items-center gap-2">
+              <AlertCircle size={18} />
               {error}
             </div>
           )}
@@ -49,33 +54,33 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-light mb-2">Email</label>
+              <label className="block text-sm font-medium text-black mb-2">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
-                className="w-full bg-dark-bg text-light border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                className="w-full bg-white text-black border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 required
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-light mb-2">Senha</label>
+              <label className="block text-sm font-medium text-black mb-2">Senha</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-dark-bg text-light border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="w-full bg-white text-black border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-light"
+                  className="absolute right-3 top-2.5 text-gray-500 hover:text-gray-700"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -86,34 +91,30 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading ? 'Autenticando...' : 'Acessar'}
             </button>
           </form>
 
           {/* Register Link */}
           <div className="mt-6 text-center">
-            <p className="text-slate-400">
+            <p className="text-gray-600">
               Não tem conta?{' '}
               <button
                 onClick={() => navigate('/register')}
-                className="text-primary hover:text-blue-300 font-semibold"
+                className="text-blue-500 hover:text-blue-600 font-semibold"
               >
-                Criar conta
+                Crie uma
               </button>
             </p>
           </div>
-
-          {/* Demo Info */}
-          <div className="mt-6 pt-6 border-t border-slate-700">
-            <p className="text-xs text-slate-400 mb-2">Contas de demo:</p>
-            <div className="space-y-1 text-xs text-slate-300">
-              <p><strong>Admin:</strong> admin@agencia.com / 123456</p>
-              <p><strong>Usuário:</strong> usuario@agencia.com / 123456</p>
-            </div>
-          </div>
         </div>
+
+        {/* Footer Info */}
+        <p className="text-center text-xs text-gray-500 mt-6">
+          Sistema seguro com autenticação criptografada
+        </p>
       </div>
     </div>
   );

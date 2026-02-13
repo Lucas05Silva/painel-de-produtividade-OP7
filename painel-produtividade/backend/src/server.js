@@ -4,23 +4,26 @@ import jwt from 'jsonwebtoken';
 import bcryptjs from 'bcryptjs';
 import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = 3000;
-const JWT_SECRET = 'sua_chave_secreta_super_segura_2024';
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'sua_chave_secreta_super_segura_2024';
 
 // Middleware
-app.use(cors());
+const CORS_ORIGIN = process.env.CORS_ORIGIN || true;
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
-// Inicializar banco de dados SQLite
-const db = new sqlite3.Database('./database.db', (err) => {
+// Inicializar banco de dados SQLite (caminho absoluto relativo a este arquivo ou via env)
+const DB_PATH = process.env.DATABASE_PATH || join(__dirname, '..', 'database.db');
+const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) console.error('Erro ao conectar ao banco:', err);
   console.log('✓ Conectado ao banco de dados SQLite');
+  console.log('  DB path:', DB_PATH);
   initDB();
 });
 
@@ -60,7 +63,7 @@ function initDB() {
       name TEXT NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
-      role TEXT DEFAULT 'user',
+      userType TEXT DEFAULT 'colaborador',
       avatar TEXT,
       createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -92,54 +95,52 @@ function initDB() {
     }
   });
 
-  // Inserir dados de demo
-  seedDB();
+  // Inicializar banco de dados vazio (sem dados de demo)
+  initializeAdminUser();
 }
 
-// Seed dados de demo
-async function seedDB() {
+// Inicializar com admins padrão
+async function initializeAdminUser() {
   try {
+    // Garantir que apenas op7f.ai@gmail.com seja adm_supremo
+    // 1) Demote qualquer outro adm_supremo
+    await dbRun("UPDATE users SET userType = 'colaborador' WHERE userType = 'adm_supremo' AND email != ?", ['op7f.ai@gmail.com']);
+
+    // 2) Criar ou promover o usuário op7f.ai@gmail.com para adm_supremo
+    const op7Admin = await dbGet('SELECT id FROM users WHERE email = ?', ['op7f.ai@gmail.com']);
+    if (!op7Admin) {
+      const hashedPassword = await bcryptjs.hash('AdminSupremo123!', 10);
+      await dbRun(
+        'INSERT INTO users (name, email, password, userType) VALUES (?, ?, ?, ?)',
+        ['OP7 Admin', 'op7f.ai@gmail.com', hashedPassword, 'adm_supremo']
+      );
+      console.log('✓ ADM Supremo OP7 criado');
+      console.log('  Email: op7f.ai@gmail.com');
+      console.log('  Senha: AdminSupremo123!');
+    } else {
+      await dbRun('UPDATE users SET userType = ? WHERE id = ?', ['adm_supremo', op7Admin.id]);
+      console.log('✓ Usuário op7f.ai@gmail.com definido como ADM Supremo');
+    }
+
+    // 3) Se existir admin@agencia.com, demote para colaborador (segurança)
     const adminExists = await dbGet('SELECT id FROM users WHERE email = ?', ['admin@agencia.com']);
-    if (!adminExists) {
-      const hashedPassword = await bcryptjs.hash('123456', 10);
-      
-      // Admin
-      await dbRun(
-        'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-        ['Diretor Admin', 'admin@agencia.com', hashedPassword, 'admin']
-      );
-
-      // Usuário demo
-      await dbRun(
-        'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-        ['Usuário Demo', 'usuario@agencia.com', hashedPassword, 'user']
-      );
-
-      // Inserir demandas demo
-      const users = await dbAll('SELECT id FROM users');
-      const categorias = ['Design', 'Copy', 'Tráfego Pago', 'Automação', 'Reunião', 'Suporte'];
-      const clientes = ['Empresa A', 'Empresa B', 'Empresa C', 'Startup X', 'Premium Y'];
-
-      for (let i = 0; i < 15; i++) {
-        await dbRun(
-          'INSERT INTO demandas (userId, categoria, cliente, descricao, tempo, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [
-            users[i % 2].id,
-            categorias[i % categorias.length],
-            clientes[i % clientes.length],
-            `Descrição da demanda ${i + 1}`,
-            Math.floor(Math.random() * 240) + 30,
-            ['Pendente', 'Em andamento', 'Finalizado'][i % 3]
-          ]
-        );
-      }
-
-      console.log('✓ Dados de demo inseridos');
+    if (adminExists) {
+      await dbRun('UPDATE users SET userType = ? WHERE id = ?', ['colaborador', adminExists.id]);
+      console.log('✓ admin@agencia.com demoted para colaborador');
     }
   } catch (error) {
-    console.error('Erro ao seed DB:', error);
+    console.error('Erro ao inicializar admin:', error);
   }
 }
+
+// Função auxiliar para validar categorias
+const CATEGORIAS_VALIDAS = [
+  'Automação & IA',
+  'Planejamento',
+  'Criação & Design',
+  'Suporte & Atendimento',
+  'Tráfego Pago'
+];
 
 // Middleware de autenticação
 const authenticateToken = (req, res, next) => {
@@ -160,7 +161,18 @@ const authenticateToken = (req, res, next) => {
 // Register
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, userType } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Nome, email e senha são obrigatórios' });
+    }
+
+    const validUserTypes = ['colaborador', 'diretor', 'adm_supremo'];
+    const type = userType || 'colaborador';
+    
+    if (!validUserTypes.includes(type)) {
+      return res.status(400).json({ message: 'Tipo de usuário inválido' });
+    }
 
     const existingUser = await dbGet('SELECT id FROM users WHERE email = ?', [email]);
     if (existingUser) {
@@ -169,11 +181,11 @@ app.post('/api/auth/register', async (req, res) => {
 
     const hashedPassword = await bcryptjs.hash(password, 10);
     const result = await dbRun(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-      [name, email, hashedPassword, 'user']
+      'INSERT INTO users (name, email, password, userType) VALUES (?, ?, ?, ?)',
+      [name, email, hashedPassword, type]
     );
 
-    const user = await dbGet('SELECT id, name, email, role FROM users WHERE id = ?', [result.id]);
+    const user = await dbGet('SELECT id, name, email, userType FROM users WHERE id = ?', [result.id]);
     const token = jwt.sign(user, JWT_SECRET, { expiresIn: '30d' });
 
     res.status(201).json({ token, user });
@@ -197,7 +209,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ message: 'Senha inválida' });
     }
 
-    const userObj = { id: user.id, name: user.name, email: user.email, role: user.role };
+    const userObj = { id: user.id, name: user.name, email: user.email, userType: user.userType };
     const token = jwt.sign(userObj, JWT_SECRET, { expiresIn: '30d' });
 
     res.json({ token, user: userObj });
@@ -207,16 +219,9 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Get current user
-app.get('/api/auth/me', authenticateToken, async (req, res) => {
-  try {
-    const user = await dbGet(
-      'SELECT id, name, email, role, avatar FROM users WHERE id = ?',
-      [req.user.id]
-    );
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+app.get('/api/auth/me', authenticateToken, (req, res) => {
+  // Simples: se chegou aqui, token é válido. Retornar dados do token.
+  res.json(req.user);
 });
 
 // Update profile
@@ -259,7 +264,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
     await dbRun(updateQuery, params);
 
     const updatedUser = await dbGet(
-      'SELECT id, name, email, role, avatar FROM users WHERE id = ?',
+      'SELECT id, name, email, userType, avatar FROM users WHERE id = ?',
       [req.user.id]
     );
 
@@ -271,14 +276,28 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
 
 // ==================== DEMANDAS ROUTES ====================
 
-// Get demandas do usuário
+// Get demandas (com controle de acesso)
 app.get('/api/demandas', authenticateToken, async (req, res) => {
   try {
-    const { categoria, status } = req.query;
-    let query = 'SELECT * FROM demandas WHERE userId = ? ORDER BY data DESC';
-    let params = [req.user.id];
+    const { categoria, status, userId } = req.query;
+    
+    let query = 'SELECT * FROM demandas WHERE 1=1';
+    let params = [];
+
+    // Controle de acesso: colaborador vê apenas suas demandas
+    if (req.user.userType === 'colaborador') {
+      query += ' AND userId = ?';
+      params.push(req.user.id);
+    } else if (userId) {
+      // Diretor ou admin podem filtrar por usuário
+      query += ' AND userId = ?';
+      params.push(userId);
+    }
 
     if (categoria) {
+      if (!CATEGORIAS_VALIDAS.includes(categoria)) {
+        return res.status(400).json({ message: 'Categoria inválida' });
+      }
       query += ' AND categoria = ?';
       params.push(categoria);
     }
@@ -288,8 +307,26 @@ app.get('/api/demandas', authenticateToken, async (req, res) => {
       params.push(status);
     }
 
+    query += ' ORDER BY data DESC';
     const demandas = await dbAll(query, params);
     res.json(demandas);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get demanda by ID
+app.get('/api/demandas/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const demanda = await dbGet('SELECT * FROM demandas WHERE id = ? AND userId = ?', [id, req.user.id]);
+    
+    if (!demanda) {
+      return res.status(404).json({ message: 'Demanda não encontrada' });
+    }
+
+    res.json(demanda);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -299,6 +336,11 @@ app.get('/api/demandas', authenticateToken, async (req, res) => {
 app.post('/api/demandas', authenticateToken, async (req, res) => {
   try {
     const { categoria, cliente, descricao, tempo, status } = req.body;
+
+    // Validar categoria
+    if (!CATEGORIAS_VALIDAS.includes(categoria)) {
+      return res.status(400).json({ message: 'Categoria inválida. Categorias válidas: ' + CATEGORIAS_VALIDAS.join(', ') });
+    }
 
     const result = await dbRun(
       'INSERT INTO demandas (userId, categoria, cliente, descricao, tempo, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -492,47 +534,120 @@ app.get('/api/ranking', authenticateToken, async (req, res) => {
 
 // ==================== ADMIN ROUTES ====================
 
+// Get all users (apenas ADM Supremo ou Diretor)
 app.get('/api/admin/users', authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.userType !== 'adm_supremo' && req.user.userType !== 'diretor') {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
-    const users = await dbAll('SELECT id, name, email, role, avatar FROM users');
+    const users = await dbAll('SELECT id, name, email, userType, avatar FROM users ORDER BY name');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
+// Get all demandas (apenas ADM Supremo ou Diretor)
 app.get('/api/admin/demandas', authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.userType !== 'adm_supremo' && req.user.userType !== 'diretor') {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
     const { userId, categoria, status } = req.query;
-    let query = 'SELECT * FROM demandas WHERE 1=1';
+    let query = 'SELECT d.*, u.name FROM demandas d JOIN users u ON d.userId = u.id WHERE 1=1';
     let params = [];
 
     if (userId) {
-      query += ' AND userId = ?';
+      query += ' AND d.userId = ?';
       params.push(userId);
     }
     if (categoria) {
-      query += ' AND categoria = ?';
+      query += ' AND d.categoria = ?';
       params.push(categoria);
     }
     if (status) {
-      query += ' AND status = ?';
+      query += ' AND d.status = ?';
       params.push(status);
     }
 
-    query += ' ORDER BY data DESC';
+    query += ' ORDER BY d.data DESC';
     const demandas = await dbAll(query, params);
     res.json(demandas);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Update user type (apenas ADM Supremo)
+app.put('/api/admin/users/:id/type', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.userType !== 'adm_supremo') {
+      return res.status(403).json({ message: 'Apenas ADM Supremo pode alterar tipos de usuário' });
+    }
+
+    const { id } = req.params;
+    const { userType } = req.body;
+
+    const validUserTypes = ['colaborador', 'diretor', 'adm_supremo'];
+    if (!validUserTypes.includes(userType)) {
+      return res.status(400).json({ message: 'Tipo de usuário inválido' });
+    }
+
+    // Não permitir múltiplos ADM Supremo
+    if (userType === 'adm_supremo') {
+      const existingAdmin = await dbGet('SELECT id FROM users WHERE userType = ? AND id != ?', ['adm_supremo', id]);
+      if (existingAdmin) {
+        return res.status(403).json({ message: 'Já existe um ADM Supremo' });
+      }
+    }
+
+    await dbRun('UPDATE users SET userType = ? WHERE id = ?', [userType, id]);
+    
+    const updatedUser = await dbGet('SELECT id, name, email, userType, avatar FROM users WHERE id = ?', [id]);
+    res.json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete user (apenas ADM Supremo)
+app.delete('/api/admin/users/:id', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.userType !== 'adm_supremo') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { id } = req.params;
+
+    if (req.user.id === parseInt(id)) {
+      return res.status(400).json({ message: 'Não é possível deletar sua própria conta' });
+    }
+
+    // Deletar demandas do usuário
+    await dbRun('DELETE FROM demandas WHERE userId = ?', [id]);
+    // Deletar usuário
+    await dbRun('DELETE FROM users WHERE id = ?', [id]);
+
+    res.json({ message: 'Usuário deletado com sucesso' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get categorias válidas
+app.get('/api/categorias', authenticateToken, async (req, res) => {
+  res.json(CATEGORIAS_VALIDAS);
+});
+
+// Health check
+app.get('/health', async (req, res) => {
+  try {
+    await dbGet('SELECT 1 as ok');
+    res.json({ status: 'ok', db: true });
+  } catch (error) {
+    res.status(500).json({ status: 'error', db: false, message: error.message });
   }
 });
 
@@ -542,7 +657,7 @@ app.listen(PORT, () => {
   console.log(`✓ Servidor rodando em http://localhost:${PORT}`);
   console.log('✓ CORS habilitado');
   console.log('✓ Banco de dados pronto');
-  console.log('\n📧 Contas de demo:');
-  console.log('   Admin: admin@agencia.com / 123456');
-  console.log('   Usuário: usuario@agencia.com / 123456');
+  console.log('');
+  console.log('🔐 Sistema pronto para uso');
+  console.log('   Acesse /login com suas credenciais');
 });

@@ -1,72 +1,106 @@
-import { BarChart3, FileText, Plus, Trophy, User, Settings, LogOut, Menu, X } from 'lucide-react';
+import { BarChart3, FileText, Plus, Trophy, User, Settings, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from './Logo';
 
 export default function Sidebar() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   const menuItems = [
-    { icon: BarChart3, label: 'Dashboard', path: '/dashboard' },
-    { icon: FileText, label: 'Minhas Demandas', path: '/demandas' },
-    { icon: Plus, label: 'Registrar Nova', path: '/nova-demanda' },
-    { icon: Menu, label: 'Kanban', path: '/kanban' },
-    { icon: Trophy, label: 'Ranking', path: '/ranking' },
-    { icon: User, label: 'Perfil', path: '/perfil' },
-    ...(user?.role === 'admin' ? [{ icon: Settings, label: 'Painel Admin', path: '/admin' }] : []),
+    { icon: BarChart3, label: 'Dashboard', path: '/dashboard', roles: ['colaborador', 'diretor', 'adm_supremo'] },
+    { icon: FileText, label: 'Minhas Demandas', path: '/demandas', roles: ['colaborador', 'diretor', 'adm_supremo'] },
+    { icon: Plus, label: 'Nova Demanda', path: '/nova-demanda', roles: ['colaborador', 'diretor', 'adm_supremo'] },
+    { icon: Menu, label: 'Kanban', path: '/kanban', roles: ['colaborador', 'diretor', 'adm_supremo'] },
+    { icon: Trophy, label: 'Ranking', path: '/ranking', roles: ['colaborador', 'diretor', 'adm_supremo'] },
+    { icon: User, label: 'Perfil', path: '/perfil', roles: ['colaborador', 'diretor', 'adm_supremo'] },
+    { icon: FileText, label: 'Relatórios', path: '/relatorios', roles: ['diretor', 'adm_supremo'] },
+    { icon: Settings, label: 'Gerenciar Usuários', path: '/admin', roles: ['adm_supremo'] },
+    { icon: Settings, label: 'Painel Diretor', path: '/admin', roles: ['diretor'] },
   ];
+
+  const visibleItems = !loading && user ? menuItems.filter(item => item.roles.includes(user.userType)) : [];
+
+  const handleNavigate = (path) => {
+    navigate(path);
+    setIsOpen(false);
+  };
 
   return (
     <>
-      {/* Mobile Toggle */}
+      {/* Mobile Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden bg-primary text-white p-2 rounded-lg"
+        className="lg:hidden fixed top-4 left-4 z-50 bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
       >
-        {isOpen ? <X size={20} /> : <Menu size={20} />}
+        {isOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Sidebar */}
-      <aside
-        className={`fixed left-0 top-0 h-full bg-card-dark border-r border-slate-700 transition-all duration-300 z-40 ${
-          isOpen ? 'w-64' : 'w-0'
-        } overflow-hidden lg:w-64`}
+      {/* Sidebar Container */}
+      <div
+        className={`fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 z-40 lg:relative lg:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
-        {/* Logo */}
-        <div className="p-6 border-b border-slate-700">
-          <h1 className="text-2xl font-bold text-primary">Produtividade</h1>
-          <p className="text-xs text-slate-400 mt-1">Sistema de Demandas</p>
+        {/* Logo Section */}
+        <div className="p-6 border-b border-gray-200">
+          <Logo size="md" showText={true} />
+          <p className="text-xs text-gray-500 mt-2">Sistema de Demandas</p>
         </div>
 
         {/* Menu Items */}
-        <nav className="p-4 space-y-2">
-          {menuItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-700 text-light transition-colors group"
-            >
-              <item.icon size={20} className="text-primary group-hover:text-blue-300" />
-              <span className="text-sm font-medium">{item.label}</span>
-            </button>
-          ))}
+        <nav className="p-4 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <p className="text-xs text-gray-500 ml-2">Carregando...</p>
+            </div>
+          ) : !user ? (
+            <div className="text-center py-8">
+              <p className="text-xs text-red-500 font-semibold">⚠️ Usuário não carregado</p>
+              <p className="text-xs text-gray-500 mt-2">Tente fazer login novamente</p>
+            </div>
+          ) : visibleItems.length > 0 ? (
+            visibleItems.map((item) => {
+              const isActive = window.location.pathname === item.path;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => handleNavigate(item.path)}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-blue-500 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-xs text-orange-500 font-semibold">⚠️ Nenhum menu disponível</p>
+              <p className="text-xs text-gray-500 mt-2">Tipo: {user?.userType || 'indefinido'}</p>
+            </div>
+          )}
         </nav>
 
-        {/* Footer Info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700 bg-dark-bg">
-          <p className="text-xs text-slate-400">
-            Versão <span className="text-primary font-bold">1.0</span>
-          </p>
+        {/* Footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
+          <p className="text-xs text-gray-500">Sistema v1.0</p>
+          {user && <p className="text-xs text-blue-600 mt-1 truncate font-semibold">{user.email}</p>}
         </div>
-      </aside>
+      </div>
 
       {/* Mobile Overlay */}
       {isOpen && (
         <div
+          className="fixed inset-0 bg-black bg-opacity-30 z-30 lg:hidden"
           onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
         />
       )}
     </>

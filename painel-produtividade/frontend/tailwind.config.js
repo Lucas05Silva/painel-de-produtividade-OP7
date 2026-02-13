@@ -7,15 +7,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        'primary': '#2563eb',
-        'dark': '#0f172a',
-        'light': '#f8fafc',
-        'slate-dark': '#1e293b',
+        // Paleta corporativa moderna
+        'corporate': {
+          'white': '#ffffff',
+          'black': '#000000',
+          'blue-light': '#3b82f6',
+          'blue-lighter': '#dbeafe',
+          'gray-light': '#f3f4f6',
+          'gray-medium': '#e5e7eb',
+          'gray-dark': '#6b7280',
+          'gray-darker': '#374151',
+        },
+        'primary': '#3b82f6',
+        'secondary': '#f3f4f6',
+        'accent': '#dbeafe',
       },
-      backgroundColor: {
-        'dark-bg': '#0f172a',
-        'card-dark': '#1e293b',
-      }
     },
   },
   plugins: [],

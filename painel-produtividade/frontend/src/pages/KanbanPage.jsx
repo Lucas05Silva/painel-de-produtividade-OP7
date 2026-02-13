@@ -1,19 +1,25 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 
 const statusList = ['Pendente', 'Em andamento', 'Finalizado'];
 
+const CATEGORIAS_FIXAS = [
+  'Automação & IA',
+  'Planejamento',
+  'Criação & Design',
+  'Suporte & Atendimento',
+  'Tráfego Pago'
+];
+
 const categoryColors = {
-  'Design': 'bg-purple-500',
-  'Copy': 'bg-blue-500',
-  'Tráfego Pago': 'bg-red-500',
-  'Automação': 'bg-green-500',
-  'Reunião': 'bg-yellow-500',
-  'Suporte': 'bg-pink-500',
-  'Outro': 'bg-slate-500'
+  'Automação & IA': 'bg-green-500',
+  'Planejamento': 'bg-blue-500',
+  'Criação & Design': 'bg-purple-500',
+  'Suporte & Atendimento': 'bg-pink-500',
+  'Tráfego Pago': 'bg-red-500'
 };
 
 export default function KanbanPage() {
@@ -90,15 +96,23 @@ export default function KanbanPage() {
     }
   };
 
-  if (loading) return <Layout><div>Carregando...</div></Layout>;
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-bold text-light mb-2">Visualização Kanban</h1>
-          <p className="text-slate-400">Arraste as demandas entre os status</p>
+          <h1 className="text-4xl font-bold text-black mb-2">📋 Visualização Kanban</h1>
+          <p className="text-gray-600">Arraste as demandas entre os status para atualizá-las</p>
         </div>
 
         {/* Kanban Board */}
@@ -108,12 +122,17 @@ export default function KanbanPage() {
               key={status}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, status)}
-              className="bg-card-dark rounded-lg p-4 min-h-[600px] border-2 border-dashed border-slate-700 hover:border-primary transition-colors"
+              className="bg-gray-50 rounded-lg p-4 min-h-[600px] border-2 border-dashed border-gray-300 hover:border-blue-500 transition-colors"
             >
               {/* Column Header */}
               <div className="mb-4">
-                <h2 className="text-light font-bold text-lg">{status}</h2>
-                <p className="text-slate-400 text-sm">
+                <h2 className="text-black font-bold text-lg">
+                  {status === 'Pendente' && '⏳'} 
+                  {status === 'Em andamento' && '⚙️'} 
+                  {status === 'Finalizado' && '✅'} 
+                  {' '}{status}
+                </h2>
+                <p className="text-gray-600 text-sm">
                   {demandas[status].length} {demandas[status].length === 1 ? 'tarefa' : 'tarefas'}
                 </p>
               </div>
@@ -122,7 +141,7 @@ export default function KanbanPage() {
               <div className="space-y-3">
                 {demandas[status].length === 0 ? (
                   <div className="text-center py-12">
-                    <p className="text-slate-500 text-sm">Nenhuma tarefa aqui</p>
+                    <p className="text-gray-500 text-sm">Nenhuma tarefa aqui</p>
                   </div>
                 ) : (
                   demandas[status].map(demanda => (
@@ -130,21 +149,21 @@ export default function KanbanPage() {
                       key={demanda.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, status, demanda)}
-                      className="bg-dark-bg rounded-lg p-4 cursor-move hover:shadow-lg transition-all transform hover:-translate-y-1 border-l-4"
-                      style={{ borderLeftColor: categoryColors[demanda.categoria] || '#6366f1' }}
+                      className="bg-white rounded-lg p-4 cursor-move hover:shadow-lg transition-all transform hover:-translate-y-1 border-l-4 border border-gray-200"
+                      style={{ borderLeftColor: categoryColors[demanda.categoria] || '#3b82f6' }}
                     >
                       <div className="mb-2">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold text-white ${categoryColors[demanda.categoria]}`}>
-                          {demanda.categoria}
+                        <span className={`px-2 py-1 rounded text-xs font-semibold text-white ${categoryColors[demanda.categoria] || 'bg-gray-500'}`}>
+                          {demanda.categoria || 'Sem categoria'}
                         </span>
                       </div>
                       
-                      <h3 className="text-light font-bold text-sm mb-1">{demanda.cliente}</h3>
-                      <p className="text-slate-400 text-xs mb-3 line-clamp-2">{demanda.descricao}</p>
+                      <h3 className="text-black font-bold text-sm mb-1">{demanda.cliente}</h3>
+                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">{demanda.descricao}</p>
                       
-                      <div className="flex items-center justify-between text-xs text-slate-500">
+                      <div className="flex items-center justify-between text-xs text-gray-500">
                         <span>⏱️ {demanda.tempo}m</span>
-                        <span>{new Date(demanda.data).toLocaleDateString()}</span>
+                        <span>{new Date(demanda.data).toLocaleDateString('pt-BR')}</span>
                       </div>
                     </div>
                   ))
@@ -155,9 +174,9 @@ export default function KanbanPage() {
         </div>
 
         {/* Info */}
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-          <p className="text-blue-300 text-sm">
-            💡 <strong>Dica:</strong> Arraste as tarefas entre os colunas para alterar seu status. Os dados serão salvos automaticamente.
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-blue-700 text-sm">
+            💡 <strong>Dica:</strong> Arraste as tarefas entre as colunas para alterar seu status. Os dados serão salvos automaticamente.
           </p>
         </div>
       </div>

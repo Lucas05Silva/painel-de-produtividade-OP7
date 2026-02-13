@@ -1,205 +1,376 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Filter, Download, Eye } from 'lucide-react';
+import { Shield, Users, FileText, BarChart3, Plus, Edit2, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 
 export default function AdminPage() {
-  const { token } = useAuth();
+  const { user, token } = useAuth();
   const [users, setUsers] = useState([]);
-  const [allDemandas, setAllDemandas] = useState([]);
+  const [demandas, setDemandas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState('');
-  const [filterDate, setFilterDate] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
+  const [activeTab, setActiveTab] = useState('users');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    userType: 'colaborador'
+  });
+
+  // Apenas ADM Supremo pode acessar
+  const isAdminSupremo = user?.userType === 'adm_supremo';
 
   useEffect(() => {
-    const fetchAdminData = async () => {
+    if (!isAdminSupremo) return;
+
+    const fetchData = async () => {
       try {
         const [usersRes, demandasRes] = await Promise.all([
           axios.get('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
           axios.get('/api/admin/demandas', { headers: { Authorization: `Bearer ${token}` } })
         ]);
         setUsers(usersRes.data);
-        setAllDemandas(demandasRes.data);
+        setDemandas(demandasRes.data);
       } catch (error) {
-        console.error('Erro ao carregar dados admin:', error);
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
       }
     };
-    fetchAdminData();
-  }, [token]);
 
-  // Filtrar demandas
-  const filteredDemandas = allDemandas.filter(d => {
-    if (selectedUser && d.userId !== selectedUser) return false;
-    if (filterDate && !new Date(d.data).toDateString().includes(filterDate)) return false;
-    if (filterCategory && d.categoria !== filterCategory) return false;
-    return true;
-  });
+    fetchData();
+  }, [token, isAdminSupremo]);
 
-  // Calcular estatísticas
-  const totalMinutos = filteredDemandas.reduce((acc, d) => acc + d.tempo, 0);
-  const totalDemandas = filteredDemandas.length;
-  const demandaFinalizadas = filteredDemandas.filter(d => d.status === 'Finalizado').length;
-
-  const categorias = ['Design', 'Copy', 'Tráfego Pago', 'Automação', 'Reunião', 'Suporte', 'Outro'];
-
-  const handleExportCSV = () => {
-    const csv = [
-      ['Usuário', 'Categoria', 'Cliente', 'Status', 'Tempo (min)', 'Data'],
-      ...filteredDemandas.map(d => {
-        const user = users.find(u => u.id === d.userId);
-        return [user?.name || 'N/A', d.categoria, d.cliente, d.status, d.tempo, d.data];
-      })
-    ]
-      .map(row => row.join(','))
-      .join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'demandas-export.csv';
-    a.click();
+  const handleUpdateUserType = async (userId, newType) => {
+    try {
+      const response = await axios.put(
+        `/api/admin/users/${userId}/type`,
+        { userType: newType },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setUsers(users.map(u => u.id === userId ? response.data : u));
+      alert('Tipo de usuário atualizado com sucesso');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Erro ao atualizar usuário');
+    }
   };
 
-  if (loading) return <Layout><div>Carregando...</div></Layout>;
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Tem certeza que deseja deletar este usuário?')) return;
+
+    try {
+      await axios.delete(`/api/admin/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUsers(users.filter(u => u.id !== userId));
+      alert('Usuário deletado com sucesso');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Erro ao deletar usuário');
+    }
+  };
+
+  if (!isAdminSupremo) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <Shield size={48} className="mx-auto mb-4 text-red-500" />
+            <h2 className="text-2xl font-bold text-black mb-2">Acesso Restrito</h2>
+            <p className="text-gray-600">Apenas ADM Supremo pode acessar este painel</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Carregando painel administrativo...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const userTypeColor = {
+    'adm_supremo': 'bg-red-100 text-red-800',
+    'diretor': 'bg-purple-100 text-purple-800',
+    'colaborador': 'bg-blue-100 text-blue-800'
+  };
+
+  const userTypeLabel = {
+    'adm_supremo': 'ADM Supremo',
+    'diretor': 'Diretor/Gestor',
+    'colaborador': 'Colaborador'
+  };
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-4xl font-bold text-light mb-2">Painel do Diretor</h1>
-          <p className="text-slate-400">Visão completa da agência</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="card">
-            <p className="text-slate-400 text-sm mb-1">Total de Demandas</p>
-            <h3 className="text-3xl font-bold text-light">{totalDemandas}</h3>
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-red-100 rounded-lg">
+            <Shield size={24} className="text-red-600" />
           </div>
-          <div className="card">
-            <p className="text-slate-400 text-sm mb-1">Finalizadas</p>
-            <h3 className="text-3xl font-bold text-green-400">{demandaFinalizadas}</h3>
-          </div>
-          <div className="card">
-            <p className="text-slate-400 text-sm mb-1">Total de Minutos</p>
-            <h3 className="text-3xl font-bold text-primary">{totalMinutos}</h3>
-          </div>
-          <div className="card">
-            <p className="text-slate-400 text-sm mb-1">Membros</p>
-            <h3 className="text-3xl font-bold text-light">{users.length}</h3>
+          <div>
+            <h1 className="text-4xl font-bold text-black">Painel de Administração</h1>
+            <p className="text-gray-600">Gerenciar usuários e sistema</p>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="card">
-          <h3 className="text-light font-bold mb-4 flex items-center gap-2">
-            <Filter size={20} /> Filtros
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-light mb-2">Usuário</label>
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="w-full bg-dark-bg text-light border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
-              >
-                <option value="">Todos</option>
-                {users.map(user => (
-                  <option key={user.id} value={user.id}>{user.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-light mb-2">Data</label>
-              <input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="w-full bg-dark-bg text-light border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-light mb-2">Categoria</label>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="w-full bg-dark-bg text-light border border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:border-primary"
-              >
-                <option value="">Todas</option>
-                {categorias.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                onClick={handleExportCSV}
-                className="w-full bg-primary hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                <Download size={18} /> Exportar CSV
-              </button>
-            </div>
+        {/* Alert */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-yellow-900">Painel Restrito</h3>
+            <p className="text-sm text-yellow-800 mt-1">
+              Você está acessando o painel de controle de sistema. Todas as ações aqui são registradas.
+            </p>
           </div>
         </div>
 
-        {/* Demandas Table */}
-        <div className="card overflow-x-auto">
-          <h3 className="text-light font-bold mb-4">Demandas Registradas</h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-700">
-                <th className="text-left py-3 px-4 text-slate-400 font-semibold">Usuário</th>
-                <th className="text-left py-3 px-4 text-slate-400 font-semibold">Categoria</th>
-                <th className="text-left py-3 px-4 text-slate-400 font-semibold">Cliente</th>
-                <th className="text-left py-3 px-4 text-slate-400 font-semibold">Status</th>
-                <th className="text-left py-3 px-4 text-slate-400 font-semibold">Tempo</th>
-                <th className="text-left py-3 px-4 text-slate-400 font-semibold">Data</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDemandas.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="text-center py-8 text-slate-400">
-                    Nenhuma demanda encontrada
-                  </td>
-                </tr>
-              ) : (
-                filteredDemandas.map(demanda => {
-                  const user = users.find(u => u.id === demanda.userId);
-                  return (
-                    <tr key={demanda.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                      <td className="py-3 px-4 text-light">{user?.name}</td>
-                      <td className="py-3 px-4 text-light">{demanda.categoria}</td>
-                      <td className="py-3 px-4 text-light">{demanda.cliente}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          demanda.status === 'Finalizado'
-                            ? 'bg-green-500/20 text-green-300'
-                            : demanda.status === 'Em andamento'
-                            ? 'bg-blue-500/20 text-blue-300'
-                            : 'bg-yellow-500/20 text-yellow-300'
-                        }`}>
-                          {demanda.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-light">{demanda.tempo}m</td>
-                      <td className="py-3 px-4 text-slate-400">{new Date(demanda.data).toLocaleDateString()}</td>
+        {/* Tabs */}
+        <div className="flex gap-4 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-4 py-3 font-semibold transition-colors border-b-2 ${
+              activeTab === 'users'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-black'
+            }`}
+          >
+            <Users size={18} className="inline mr-2" />
+            Usuários ({users.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('demandas')}
+            className={`px-4 py-3 font-semibold transition-colors border-b-2 ${
+              activeTab === 'demandas'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-600 hover:text-black'
+            }`}
+          >
+            <FileText size={18} className="inline mr-2" />
+            Demandas ({demandas.length})
+          </button>
+        </div>
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Total de Usuários</p>
+                    <h3 className="text-3xl font-bold text-black">{users.length}</h3>
+                  </div>
+                  <Users size={40} className="text-blue-500 opacity-40" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Colaboradores</p>
+                    <h3 className="text-3xl font-bold text-black">
+                      {users.filter(u => u.userType === 'colaborador').length}
+                    </h3>
+                  </div>
+                  <Users size={40} className="text-blue-500 opacity-40" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Diretores</p>
+                    <h3 className="text-3xl font-bold text-black">
+                      {users.filter(u => u.userType === 'diretor').length}
+                    </h3>
+                  </div>
+                  <Users size={40} className="text-purple-500 opacity-40" />
+                </div>
+              </div>
+            </div>
+
+            {/* Users Table */}
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-black">Lista de Usuários</h2>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-4 py-3 text-left font-semibold text-black">Nome</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Email</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Tipo</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Data</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Ações</th>
                     </tr>
-                  );
-                })
+                  </thead>
+                  <tbody>
+                    {users.map((u) => (
+                      <tr key={u.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            {u.avatar ? (
+                              <img src={u.avatar} alt={u.name} className="w-8 h-8 rounded-full" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-xs font-semibold">
+                                {u.name.charAt(0)}
+                              </div>
+                            )}
+                            <span className="font-medium text-black">{u.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={u.userType}
+                            onChange={(e) => handleUpdateUserType(u.id, e.target.value)}
+                            disabled={u.id === user?.id}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold border-0 ${userTypeColor[u.userType]} cursor-pointer`}
+                          >
+                            <option value="colaborador">{userTypeLabel.colaborador}</option>
+                            <option value="diretor">{userTypeLabel.diretor}</option>
+                            {u.userType === 'adm_supremo' && (
+                              <option value="adm_supremo">{userTypeLabel.adm_supremo}</option>
+                            )}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 text-xs">
+                          {new Date(u.createdAt).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-4 py-3">
+                          {u.id !== user?.id && (
+                            <button
+                              onClick={() => handleDeleteUser(u.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
+                              title="Deletar usuário"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Demandas Tab */}
+        {activeTab === 'demandas' && (
+          <div className="space-y-6">
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Total</p>
+                    <h3 className="text-3xl font-bold text-black">{demandas.length}</h3>
+                  </div>
+                  <FileText size={40} className="text-blue-500 opacity-40" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Pendentes</p>
+                    <h3 className="text-3xl font-bold text-black">
+                      {demandas.filter(d => d.status === 'Pendente').length}
+                    </h3>
+                  </div>
+                  <AlertCircle size={40} className="text-red-500 opacity-40" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Em Andamento</p>
+                    <h3 className="text-3xl font-bold text-black">
+                      {demandas.filter(d => d.status === 'Em andamento').length}
+                    </h3>
+                  </div>
+                  <BarChart3 size={40} className="text-amber-500 opacity-40" />
+                </div>
+              </div>
+
+              <div className="card">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-600 text-sm mb-1">Finalizadas</p>
+                    <h3 className="text-3xl font-bold text-black">
+                      {demandas.filter(d => d.status === 'Finalizado').length}
+                    </h3>
+                  </div>
+                  <CheckCircle2 size={40} className="text-green-500 opacity-40" />
+                </div>
+              </div>
+            </div>
+
+            {/* Demandas Table */}
+            <div className="card overflow-hidden">
+              <h2 className="text-2xl font-bold text-black mb-6">Todas as Demandas</h2>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-4 py-3 text-left font-semibold text-black">Descrição</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Responsável</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Categoria</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Status</th>
+                      <th className="px-4 py-3 text-left font-semibold text-black">Tempo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {demandas.slice(0, 20).map((d) => {
+                      const userResponsavel = users.find(u => u.id === d.userId);
+                      const statusColor = {
+                        'Pendente': 'bg-red-100 text-red-800',
+                        'Em andamento': 'bg-amber-100 text-amber-800',
+                        'Finalizado': 'bg-green-100 text-green-800'
+                      }[d.status] || 'bg-gray-100 text-gray-800';
+
+                      return (
+                        <tr key={d.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3 text-black font-medium">{d.descricao}</td>
+                          <td className="px-4 py-3 text-gray-600">{userResponsavel?.name || 'N/A'}</td>
+                          <td className="px-4 py-3 text-gray-600">{d.categoria}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColor}`}>
+                              {d.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 font-medium">{d.tempo}min</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {demandas.length > 20 && (
+                <div className="mt-4 text-center text-sm text-gray-600">
+                  Mostrando 20 de {demandas.length} demandas
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

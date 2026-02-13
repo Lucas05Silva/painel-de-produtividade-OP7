@@ -1,6 +1,9 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
+// Configure axios baseURL from Vite env or use relative paths (for dev proxy)
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -12,14 +15,21 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       if (token) {
         try {
+          console.log('[AuthContext.checkAuth] Fetching /api/auth/me com token');
           const response = await axios.get('/api/auth/me', {
             headers: { Authorization: `Bearer ${token}` }
           });
+          console.log('[AuthContext.checkAuth] Success:', response.data);
           setUser(response.data);
         } catch (error) {
+          console.error('[AuthContext.checkAuth] Error:', error.response?.status, error.message);
           localStorage.removeItem('token');
           setToken(null);
+          setUser(null);
         }
+      } else {
+        console.log('[AuthContext.checkAuth] Sem token');
+        setUser(null);
       }
       setLoading(false);
     };
@@ -27,18 +37,24 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (email, password) => {
+    console.log('[AuthContext.login] Iniciando login...');
     const response = await axios.post('/api/auth/login', { email, password });
+    console.log('[AuthContext.login] Response:', response.data);
     const { token, user } = response.data;
     localStorage.setItem('token', token);
+    console.log('[AuthContext.login] Token salvo, atualizando estado...');
     setToken(token);
     setUser(user);
     return response.data;
   };
 
-  const register = async (name, email, password) => {
-    const response = await axios.post('/api/auth/register', { name, email, password });
+  const register = async (name, email, password, userType = 'colaborador') => {
+    console.log('[AuthContext.register] Iniciando registro...');
+    const response = await axios.post('/api/auth/register', { name, email, password, userType });
+    console.log('[AuthContext.register] Response:', response.data);
     const { token, user } = response.data;
     localStorage.setItem('token', token);
+    console.log('[AuthContext.register] Token salvo, atualizando estado...');
     setToken(token);
     setUser(user);
     return response.data;
